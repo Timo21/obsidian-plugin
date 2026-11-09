@@ -9,6 +9,7 @@ import {
 	isEvent,
 	parse,
 	toDateRange,
+	type Event as MwEvent,
 } from '@markwhen/parser';
 import { EditorView, ViewPlugin } from '@codemirror/view';
 import { StateEffect } from '@codemirror/state';
@@ -318,20 +319,20 @@ export class MarkwhenView extends MarkdownView {
 						return;
 					}
 
-					const eventNode = get(events, path) as Node<Event>;
-					if (!eventNode || !eventNode.value) {
+					const event = get(events, path);
+					if (!event || !isEvent(event)) {
 						console.log('[Markwhen] Event not found at path:', path);
 						return;
 					}
 
-					console.log('[Markwhen] Opening modal for event:', eventNode.value);
-					this.showEventDetailModal(eventNode.value);
+					console.log('[Markwhen] Opening modal for event:', event);
+					this.showEventDetailModal(event);
 				}
 			}
 		});
 	}
 
-	showEventDetailModal(event: Event) {
+	showEventDetailModal(event: MwEvent) {
 		const editorMode = this.plugin.settings.editorMode || 'wysiwyg';
 
 		if (editorMode === 'wysiwyg') {
@@ -360,13 +361,12 @@ export class MarkwhenView extends MarkdownView {
 	/**
 	 * Update event with new title, description, and optionally date range
 	 */
-	updateEventTitleDescriptionAndDate(event: Event, newTitle: string, newDescription: string, newDateRange?: string) {
+	updateEventTitleDescriptionAndDate(event: MwEvent, newTitle: string, newDescription: string, newDateRange?: string) {
 		const cm = this.getCodeMirror();
 		if (!cm) return;
 
-		const eventAny = event as any;
-		const dateFrom = eventAny.dateRangeInText?.from ?? 0;
-		const dateTo = eventAny.dateRangeInText?.to ?? 0;
+		const dateFrom = event.textRanges.datePart.from;
+		const dateTo = event.textRanges.datePart.to;
 
 		// Find the first line boundaries
 		let lineStart = dateFrom;
@@ -438,18 +438,17 @@ export class MarkwhenView extends MarkdownView {
 		});
 	}
 
-	updateEventTitleAndDescription(event: Event, newTitle: string, newDescription: string) {
+	updateEventTitleAndDescription(event: MwEvent, newTitle: string, newDescription: string) {
 		// Delegate to the new method without date change
 		this.updateEventTitleDescriptionAndDate(event, newTitle, newDescription);
 	}
 
-	updateEventDescription(event: Event, newDescription: string) {
+	updateEventDescription(event: MwEvent, newDescription: string) {
 		const cm = this.getCodeMirror();
 		if (!cm) return;
 
-		const eventAny = event as any;
-		const dateFrom = eventAny.dateRangeInText?.from ?? 0;
-		const dateTo = eventAny.dateRangeInText?.to ?? 0;
+		const dateFrom = event.textRanges.datePart.from;
+		const dateTo = event.textRanges.datePart.to;
 
 		// Find the first line (date + title)
 		let lineStart = dateFrom;

@@ -1,5 +1,5 @@
 import { App, Modal, ButtonComponent, setIcon } from 'obsidian';
-import { Event } from '@markwhen/parser';
+import { type Event as MwEvent } from '@markwhen/parser';
 import { WysiwygEditor } from './editor/WysiwygEditor';
 
 /**
@@ -26,7 +26,7 @@ interface DateTimeState {
  * - Date/time picker for event dates
  */
 export class WysiwygEventModal extends Modal {
-	event: Event;
+	event: MwEvent;
 	sourceData: string;
 	eventTitle: string;
 	eventDescription: string;
@@ -39,7 +39,7 @@ export class WysiwygEventModal extends Modal {
 
 	constructor(
 		app: App,
-		event: Event,
+		event: MwEvent,
 		sourceData: string,
 		onSave: (newTitle: string, newDescription: string, newDateRange?: string) => void
 	) {
@@ -60,9 +60,8 @@ export class WysiwygEventModal extends Modal {
 	 * Parse date/time from the event's ISO dates
 	 */
 	parseDateFromEvent(): DateTimeState {
-		const event = this.event as any;
-		const fromIso = event.dateRangeIso?.fromDateTimeIso;
-		const toIso = event.dateRangeIso?.toDateTimeIso;
+		const fromIso = this.event.dateRangeIso.fromDateTimeIso;
+		const toIso = this.event.dateRangeIso.toDateTimeIso;
 
 		const parseIso = (iso: string | undefined): { date: string; time: string; hasTime: boolean } => {
 			if (!iso) return { date: '', time: '', hasTime: false };
@@ -97,9 +96,8 @@ export class WysiwygEventModal extends Modal {
 	}
 
 	parseEventFromSource(): { title: string; description: string } {
-		const event = this.event as any;
-		const dateFrom = event.dateRangeInText?.from ?? 0;
-		const dateTo = event.dateRangeInText?.to ?? 0;
+		const dateFrom = this.event.textRanges.datePart.from;
+		const dateTo = this.event.textRanges.datePart.to;
 
 		let lineStart = dateFrom;
 		while (lineStart > 0 && this.sourceData[lineStart - 1] !== '\n') {

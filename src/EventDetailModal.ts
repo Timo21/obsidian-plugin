@@ -1,12 +1,12 @@
 import { App, Modal, MarkdownRenderer, TextAreaComponent, ButtonComponent, Component } from 'obsidian';
-import { Event } from '@markwhen/parser';
+import { type Event as MwEvent } from '@markwhen/parser';
 
 /**
  * EventDetailModal - Modal for viewing and editing Markwhen event details
  * Adapted for @markwhen/parser 0.10.15 API (editFromTimeline branch)
  */
 export class EventDetailModal extends Modal {
-	event: Event;
+	event: MwEvent;
 	sourceData: string;
 	eventTitle: string;
 	eventDescription: string;
@@ -19,7 +19,7 @@ export class EventDetailModal extends Modal {
 
 	constructor(
 		app: App,
-		event: Event,
+		event: MwEvent,
 		sourceData: string,
 		onSave: (newDescription: string) => void
 	) {
@@ -39,11 +39,9 @@ export class EventDetailModal extends Modal {
 	 * Old parser API doesn't provide these directly
 	 */
 	parseEventFromSource(): { title: string; description: string } {
-		const event = this.event as any;
-
 		// Get the position of the date in the source
-		const dateFrom = event.dateRangeInText?.from ?? 0;
-		const dateTo = event.dateRangeInText?.to ?? 0;
+		const dateFrom = this.event.textRanges.datePart.from;
+		const dateTo = this.event.textRanges.datePart.to;
 
 		// Find the full line containing the date
 		let lineStart = dateFrom;
