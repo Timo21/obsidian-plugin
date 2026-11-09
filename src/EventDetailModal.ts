@@ -1,5 +1,6 @@
 import { App, Modal, MarkdownRenderer, TextAreaComponent, ButtonComponent, Component } from 'obsidian';
 import { type Event as MwEvent } from '@markwhen/parser';
+import { eventSourceRange } from './utils/eventSourceRange';
 
 /**
  * EventDetailModal - Modal for viewing and editing Markwhen event details
@@ -39,95 +40,8 @@ export class EventDetailModal extends Modal {
 	 * Old parser API doesn't provide these directly
 	 */
 	parseEventFromSource(): { title: string; description: string } {
-		// Get the position of the date in the source
-		const dateFrom = this.event.textRanges.datePart.from;
-		const dateTo = this.event.textRanges.datePart.to;
-
-		// Find the full line containing the date
-		let lineStart = dateFrom;
-		while (lineStart > 0 && this.sourceData[lineStart - 1] !== '\n') {
-			lineStart--;
-		}
-
-		// Find end of first line
-		let lineEnd = dateTo;
-		while (lineEnd < this.sourceData.length && this.sourceData[lineEnd] !== '\n') {
-			lineEnd++;
-		}
-
-		// First line contains: "DATE: Title #tags"
-		const firstLine = this.sourceData.substring(lineStart, lineEnd);
-
-		// Find the colon AFTER the date part ends, not the first colon
-		// (times like "10:30am" have colons too!)
-		const dateEndInLine = dateTo - lineStart;
-		const afterDatePart = firstLine.substring(dateEndInLine);
-		const colonInRest = afterDatePart.indexOf(':');
-
-		let title = 'Event';
-		if (colonInRest !== -1) {
-			const afterColon = afterDatePart.substring(colonInRest + 1).trim();
-			// Remove tags from title
-			title = afterColon.replace(/#\w+/g, '').trim() || 'Event';
-		} else {
-			// No colon after date - maybe the whole rest is the title
-			const restTrimmed = afterDatePart.trim();
-			if (restTrimmed) {
-				title = restTrimmed.replace(/#\w+/g, '').trim() || 'Event';
-			}
-		}
-
-		// Find description (subsequent lines until next event or section)
-		let descriptionStart = lineEnd + 1;
-		let descriptionEnd = descriptionStart;
-
-		// Look for lines that are part of this event's description
-		// Description lines are indented or don't start with a date
-		while (descriptionEnd < this.sourceData.length) {
-			const nextLineEnd = this.sourceData.indexOf('\n', descriptionEnd);
-			const nextLine = nextLineEnd === -1
-				? this.sourceData.substring(descriptionEnd)
-				: this.sourceData.substring(descriptionEnd, nextLineEnd);
-
-			// Stop if we hit an empty line followed by a date, or a section header
-			if (this.looksLikeNewEvent(nextLine) || this.looksLikeSection(nextLine)) {
-				break;
-			}
-
-			descriptionEnd = nextLineEnd === -1 ? this.sourceData.length : nextLineEnd + 1;
-		}
-
-		const description = this.sourceData.substring(descriptionStart, descriptionEnd).trim();
-
+		const { title, description } = eventSourceRange(this.sourceData, this.event);
 		return { title, description };
-	}
-
-	/**
-	 * Check if a line looks like a new event (starts with a date)
-	 */
-	looksLikeNewEvent(line: string): boolean {
-		const trimmed = line.trim();
-		if (!trimmed) return false;
-
-		// Common date patterns
-		const datePatterns = [
-			/^\d{4}[-/]\d{1,2}[-/]\d{1,2}/,  // 2024-01-15 or 2024/01/15
-			/^\d{1,2}[-/]\d{1,2}[-/]\d{4}/,  // 01-15-2024 or 01/15/2024
-			/^(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)/i,  // Month names
-			/^now\b/i,
-			/^today\b/i,
-			/^tomorrow\b/i,
-			/^\d+\s+(day|week|month|year)s?\s+(ago|from now)/i,
-		];
-
-		return datePatterns.some(pattern => pattern.test(trimmed));
-	}
-
-	/**
-	 * Check if a line looks like a section header
-	 */
-	looksLikeSection(line: string): boolean {
-		return line.trim().toLowerCase().startsWith('section ');
 	}
 
 	onOpen() {

@@ -1,5 +1,6 @@
 import { App, Modal, ButtonComponent, setIcon } from 'obsidian';
 import { type Event as MwEvent } from '@markwhen/parser';
+import { eventSourceRange } from './utils/eventSourceRange';
 import { WysiwygEditor } from './editor/WysiwygEditor';
 
 /**
@@ -96,78 +97,8 @@ export class WysiwygEventModal extends Modal {
 	}
 
 	parseEventFromSource(): { title: string; description: string } {
-		const dateFrom = this.event.textRanges.datePart.from;
-		const dateTo = this.event.textRanges.datePart.to;
-
-		let lineStart = dateFrom;
-		while (lineStart > 0 && this.sourceData[lineStart - 1] !== '\n') {
-			lineStart--;
-		}
-
-		let lineEnd = dateTo;
-		while (lineEnd < this.sourceData.length && this.sourceData[lineEnd] !== '\n') {
-			lineEnd++;
-		}
-
-		const firstLine = this.sourceData.substring(lineStart, lineEnd);
-
-		// Find the colon AFTER the date part ends, not the first colon
-		// (times like "10:30am" have colons too!)
-		const dateEndInLine = dateTo - lineStart;
-		const afterDatePart = firstLine.substring(dateEndInLine);
-		const colonInRest = afterDatePart.indexOf(':');
-
-		let title = 'Event';
-		if (colonInRest !== -1) {
-			const afterColon = afterDatePart.substring(colonInRest + 1).trim();
-			title = afterColon.replace(/#\w+/g, '').trim() || 'Event';
-		} else {
-			// No colon after date - maybe the whole rest is the title
-			const restTrimmed = afterDatePart.trim();
-			if (restTrimmed) {
-				title = restTrimmed.replace(/#\w+/g, '').trim() || 'Event';
-			}
-		}
-
-		let descriptionStart = lineEnd + 1;
-		let descriptionEnd = descriptionStart;
-
-		while (descriptionEnd < this.sourceData.length) {
-			const nextLineEnd = this.sourceData.indexOf('\n', descriptionEnd);
-			const nextLine = nextLineEnd === -1
-				? this.sourceData.substring(descriptionEnd)
-				: this.sourceData.substring(descriptionEnd, nextLineEnd);
-
-			if (this.looksLikeNewEvent(nextLine) || this.looksLikeSection(nextLine)) {
-				break;
-			}
-
-			descriptionEnd = nextLineEnd === -1 ? this.sourceData.length : nextLineEnd + 1;
-		}
-
-		const description = this.sourceData.substring(descriptionStart, descriptionEnd).trim();
+		const { title, description } = eventSourceRange(this.sourceData, this.event);
 		return { title, description };
-	}
-
-	looksLikeNewEvent(line: string): boolean {
-		const trimmed = line.trim();
-		if (!trimmed) return false;
-
-		const datePatterns = [
-			/^\d{4}[-/]\d{1,2}[-/]\d{1,2}/,
-			/^\d{1,2}[-/]\d{1,2}[-/]\d{4}/,
-			/^(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)/i,
-			/^now\b/i,
-			/^today\b/i,
-			/^tomorrow\b/i,
-			/^\d+\s+(day|week|month|year)s?\s+(ago|from now)/i,
-		];
-
-		return datePatterns.some(pattern => pattern.test(trimmed));
-	}
-
-	looksLikeSection(line: string): boolean {
-		return line.trim().toLowerCase().startsWith('section ');
 	}
 
 	onOpen() {
