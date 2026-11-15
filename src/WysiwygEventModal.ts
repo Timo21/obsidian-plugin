@@ -36,6 +36,7 @@ export class WysiwygEventModal extends Modal {
 	editor: WysiwygEditor | null = null;
 	titleInput: HTMLInputElement | null = null;
 	dateState: DateTimeState;
+	private initialDateRange: string;
 	datePickerContainer: HTMLElement | null = null;
 
 	constructor(
@@ -55,12 +56,29 @@ export class WysiwygEventModal extends Modal {
 
 		// Initialize date state from event
 		this.dateState = this.parseDateFromEvent();
+		this.initialDateRange = this.dateStateToString();
 	}
 
 	/**
 	 * Parse date/time from the event's ISO dates
 	 */
 	parseDateFromEvent(): DateTimeState {
+		// Date-only ISO ranges have an inclusive written end, but the parser
+		// exposes an exclusive endpoint. Use the authored dates for the picker;
+		// subtracting a day from every midnight endpoint would corrupt timed events.
+		const { from: dateFrom, to: dateTo } = this.event.textRanges.datePart;
+		const dateText = this.sourceData.slice(dateFrom, dateTo).trim();
+		const dateOnly = /^(\d{4}-\d{2}-\d{2})(?:\s*\/\s*(\d{4}-\d{2}-\d{2}))?$/.exec(dateText);
+		if (dateOnly) {
+			const fromDate = dateOnly[1];
+			const toDate = dateOnly[2] || fromDate;
+			return {
+				fromDate, toDate, fromTime: '', toTime: '',
+				isRange: fromDate !== toDate,
+				hasFromTime: false, hasToTime: false,
+			};
+		}
+
 		const fromIso = this.event.dateRangeIso.fromDateTimeIso;
 		const toIso = this.event.dateRangeIso.toDateTimeIso;
 
@@ -419,7 +437,10 @@ export class WysiwygEventModal extends Modal {
 		if (this.editor && this.titleInput) {
 			const newTitle = this.titleInput.value.trim() || 'Event';
 			const newDescription = this.editor.getContent();
-			const newDateRange = this.dateStateToString();
+			const dateRange = this.dateStateToString();
+			// Do not round-trip untouched dates through the picker: parser endpoints
+			// and authored syntax are not interchangeable (relative dates included).
+			const newDateRange = dateRange === this.initialDateRange ? undefined : dateRange;
 			this.onSave(newTitle, newDescription, newDateRange);
 		}
 		this.close();

@@ -438,7 +438,7 @@ export class MarkwhenView extends MarkdownView {
 		const cm = this.getCodeMirror();
 		if (!cm) return;
 
-		const { lineStart, eventEnd, dateTo, firstLine } = eventSourceRange(
+		const { lineStart, lineEnd, eventEnd, dateTo, firstLine, description } = eventSourceRange(
 			this.data,
 			event
 		);
@@ -468,19 +468,19 @@ export class MarkwhenView extends MarkdownView {
 			}
 		}
 
-		// Build new event text
-		let newFirstLine = `${datePart}: ${newTitle}${tagsPart}`;
-		let newEventText = newFirstLine;
-		if (newDescription && newDescription.trim()) {
-			newEventText += '\n' + newDescription;
-		}
+		const newFirstLine = `${datePart}: ${newTitle}${tagsPart}`;
+		// A title/date-only edit must not normalize the untouched description or
+		// its separator before the next event, including the final newline at EOF.
+		const newEventText = newDescription === description
+			? newFirstLine + this.data.slice(lineEnd, eventEnd)
+			: newFirstLine + (newDescription.trim() ? '\n' + newDescription : '') + '\n';
 
 		// Replace in editor
 		cm.dispatch({
 			changes: {
 				from: lineStart,
 				to: eventEnd,
-				insert: newEventText + '\n',
+				insert: newEventText,
 			},
 		});
 	}
